@@ -1,15 +1,22 @@
+using System.Collections.Concurrent;
+using System.Threading.Channels;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+var promptChannel = Channel.CreateUnbounded<(string requestId, string prompt)>();
+builder.Services.AddSingleton(promptChannel);
+
+var promptStore = new ConcurrentDictionary<string, PromptRequest>();
+builder.Services.AddSingleton(promptStore);
+
+builder.Services.AddHostedService(provider => new PromptProcessingService(promptChannel, promptStore));
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -17,9 +24,6 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
-
 app.MapControllers();
-
 app.Run();
