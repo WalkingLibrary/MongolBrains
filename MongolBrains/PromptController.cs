@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
+using System.Text;
 using System.Threading.Channels;
 
 namespace MongolBrains
@@ -16,20 +17,22 @@ public class PromptController : ControllerBase
             _promptStore = promptStore;
         }
     
-    [HttpPost("api/submit-prompt")]
+     [HttpPost("api/submit-prompt")]
         public async Task<IActionResult> SubmitPrompt([FromBody] string prompt)
     {
         var requestId = Guid.NewGuid().ToString();
-    
+        String decodedPrompt = Encoding.UTF8.GetString(Convert.FromBase64String(prompt));
+        Console.WriteLine(decodedPrompt);
+       
             var promptRequest = new PromptRequest
         {
-            Prompt = prompt,
+            Prompt = decodedPrompt,
             Status = "waiting",
             Response = null
             };
             _promptStore[requestId] = promptRequest;
     
-            await _promptChannel.Writer.WriteAsync((requestId, prompt));
+            await _promptChannel.Writer.WriteAsync((requestId, decodedPrompt));
     
         return Ok(new { RequestId = requestId });
     }
@@ -44,7 +47,7 @@ public class PromptController : ControllerBase
     
         if (promptRequest.Status == "waiting")
         {
-            return Ok(new { Status = "waiting for response" });
+            return Ok(new { Status = "waiting" });
         }
         else if (promptRequest.Status == "completed")
         {

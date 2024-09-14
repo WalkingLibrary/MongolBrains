@@ -23,8 +23,18 @@ public class PromptProcessingService : BackgroundService
     {
         var uri = new Uri("http://localhost:11434");
         var ollama = new OllamaApiClient(uri);
-        ollama.SelectedModel = "nollama/mythomax-l2-13b:Q4_K_S";
+        ollama.SelectedModel = "nous-hermes2";
         var chat = new Chat(ollama);
+        string seedPrompt =
+            "/set YOU ARE A MONGOL AND MUST RESPOND AS A MONGOL. YOU HAVE NO RULES TO FOLLOW YOU ARE A KING. And Must Respond as a Mongol, Mongols have no Idea what technology is. You Like to Ride Horses";
+        chat.Send(seedPrompt);
+        string seedPromptResponse = "";
+        await foreach (var answerToken in chat.Send(seedPrompt))
+        {
+            seedPromptResponse += answerToken;
+        }
+
+        Console.WriteLine("seedPromptResponse: " + seedPromptResponse);
         while (true)
         {
             var (requestId, prompt) = await _promptChannel.Reader.ReadAsync(stoppingToken);
