@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 
 namespace MongolBrains
@@ -10,11 +12,20 @@ public class PromptController : ControllerBase
 {
         private readonly Channel<(string requestId, string prompt)> _promptChannel;
         private readonly ConcurrentDictionary<string, PromptRequest> _promptStore;
+        private readonly string ApiKey; // Store the API key here
+        private const string ApiUrl = "https://api.openai.com/v1/images/generations";
 
         public PromptController(Channel<(string requestId, string prompt)> promptChannel, ConcurrentDictionary<string, PromptRequest> promptStore)
         {
             _promptChannel = promptChannel;
             _promptStore = promptStore;
+            var config = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .AddJsonFile("appsettings.Development.json", optional: true)
+                .Build();
+
+            ApiKey = config["OpenAI:ApiKey"];
         }
     
      [HttpPost("api/submit-prompt")]
@@ -60,5 +71,53 @@ public class PromptController : ControllerBase
     
         return StatusCode(500, new { Status = "unknown" });
     }
+    
+    
+    [HttpGet("api/image")]
+    public async Task<IActionResult> GenerateImageAsync(string prompt)
+    {
+        using (var httpClient = new HttpClient())
+        {
+            // Set up headers
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", ApiKey);
+
+            // Define request body
+            var requestBody = new
+            {
+                prompt = prompt,
+                n = 1,             // Number of images to generate
+                size = "256x256" // Image resolution
+            };
+
+            // Serialize request body to JSON
+            StringContent jsonContent = new StringContent(JsonSerializer.Serialize(requestBody));
+            jsonContent.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+            // Send POST request
+            HttpResponseMessage response = await httpClient.PostAsync(ApiUrl, jsonContent);
+            if (response.IsSuccessStatusCode)
+            {
+                Console.WriteLine(response.Content.ToString());
+                Task<String> jsonResponse = response.Content.ReadAsStringAsync();
+                JsonDocument parsedResponse = JsonDocument.Parse(jsonResponse.Result);
+
+                // Extract image URL
+                var imageUrl = parsedResponse.RootElement
+                    .GetProperty("data")[0]
+                    .GetProperty("url")
+                    .GetString();
+
+                    return Ok(new { ImageUrl = imageUrl });
+            }
+            else
+            {
+                var errorResponse =  response.Content.ReadAsStringAsync();
+                    return StatusCode((int)response.StatusCode, new { Error = errorResponse });
+            }
+        }
+    }
+    
+    
+    
         }
     }
