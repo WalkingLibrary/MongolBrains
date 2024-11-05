@@ -84,9 +84,10 @@ public class PromptController : ControllerBase
             // Define request body
             var requestBody = new
             {
+                model = "dall-e-3", // Specify DALL-E 3 model explicitly
                 prompt = prompt,
                 n = 1,             // Number of images to generate
-                size = "256x256" // Image resolution
+                size = "1024x1024"   // Requested image size
             };
 
             // Serialize request body to JSON
